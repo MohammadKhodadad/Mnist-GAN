@@ -1,0 +1,115 @@
+import numpy as np
+import keras
+from keras import optimizers,Sequential,layers,activations,losses,Model
+from keras.layers import Dense,Reshape,BatchNormalization,Conv2DTranspose,Activation,Dropout,UpSampling2D,Input,Conv2D,Flatten,MaxPooling2D
+import matplotlib.pyplot as plt
+import random
+from keras.optimizers import Adam
+
+(x_train, y_train), (x_test, y_test) = keras.datasets.mnist.load_data()
+
+x_train = x_train.reshape((*x_train.shape, 1)) / 255
+x_test = x_test.reshape((*x_test.shape, 1)) / 255
+x_train.shape
+
+class GAN:
+  def __init__(self):
+    self.epsilon_decay = 0.995
+    self.learning_rate = 0.01
+    self.epochs=5000
+    self.dis=self.get_mnist_model()
+    self.gen=self.get_gen_model()
+    self.gan=self.get_gan_model(self.gen,self.dis)
+    for i in range(self.epochs):
+      print("episode: ",i )
+      self.d_t()
+      self.g_t()
+      self.g_t()
+      self.g_t()
+      self.g_t()
+  def get_mnist_model(self):
+    
+    model = Sequential()
+    model.add(Conv2D(64, (3, 3), strides=(1, 1),
+                            padding='valid', activation=activations.relu,
+                            input_shape=(28, 28, 1)))
+    model.add(MaxPooling2D((2, 2)))
+    model.add(Conv2D(64, (3, 3), strides=(1, 1),
+                            padding='valid', activation=activations.relu))
+    model.add(MaxPooling2D((2, 2)))
+    model.add(Conv2D(32, (3, 3), strides=(1, 1),
+                            padding='valid', activation=activations.relu))
+    model.add(MaxPooling2D((2, 2)))
+    model.add(Flatten())
+    model.add(Dense(64, activation=activations.relu))
+    model.add(Dropout(.25))
+    model.add(Dense(32, activation=activations.relu))
+    model.add(Dropout(.25))
+    model.add(Dense(8, activation=activations.relu))
+    model.add(Dense(2, activation=activations.softmax))
+    model.compile(optimizer=optimizers.SGD(lr=self.learning_rate),
+              loss=losses.categorical_crossentropy, metrics=[
+                  'accuracy'])
+  
+    return model
+  
+  def get_gen_model(self):
+    model = Sequential()
+    dropout = 0.4
+    depth = 256
+    dim = 7
+    model.add(Dense(dim*dim*depth, input_dim=100))
+    model.add(BatchNormalization(momentum=0.9))
+    model.add(Activation('relu'))
+    model.add(Reshape((dim, dim, depth)))
+    model.add(Dropout(dropout))
+    model.add(UpSampling2D())
+    model.add(Conv2DTranspose(int(depth/2), 5, padding='same'))
+    model.add(BatchNormalization(momentum=0.9))
+    model.add(Activation('relu'))
+    model.add(UpSampling2D())
+    model.add(Conv2DTranspose(int(depth/4), 5, padding='same'))
+    model.add(BatchNormalization(momentum=0.9))
+    model.add(Activation('relu'))
+    model.add(Conv2DTranspose(int(depth/8), 5, padding='same'))
+    model.add(BatchNormalization(momentum=0.9))
+    model.add(Activation('relu'))
+
+    model.add(Conv2DTranspose(1, 5, padding='same'))
+    model.add(Activation('sigmoid'))
+    return model
+  def get_gan_model(self,g,d):
+    self.dis.trainable=False
+    gan_input = Input(shape=(100,))
+    x = self.gen(gan_input)
+    gan_output= self.dis(x)
+    gan= Model(inputs=gan_input, outputs=gan_output)
+
+    gan.compile(optimizer=optimizers.SGD(lr=self.learning_rate),
+              loss=losses.categorical_crossentropy, metrics=[
+                  'accuracy'])
+    return gan
+  def d_t(self):
+    tr=[]
+    ans=[]
+    x=np.random.rand(64)*60000
+    for i in x:
+      tr.append(x_train[int(i)])      
+      ans.append([0,1])
+    for i in range(64):
+      ans.append([1,0])
+      tr.append(self.gen.predict(np.array([np.random.rand(100)]))[0])
+    self.dis.train_on_batch(np.array(tr),np.array(ans))
+  def g_t(self):
+    tr=[]
+    ans=[]
+    self.dis.trainable=False
+    for i in range(64):
+      tr.append(np.random.rand(100))
+      ans.append([0,1])
+    self.gan.train_on_batch(np.array(tr),np.array(ans))
+    self.dis.trainable=True
+    
+    
+    x=GAN()
+   
